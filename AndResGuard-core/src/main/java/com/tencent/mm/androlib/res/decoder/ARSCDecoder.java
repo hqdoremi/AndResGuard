@@ -84,7 +84,7 @@ public class ARSCDecoder {
   private ResguardStringBuilder mResguardBuilder;
   private boolean mShouldResguardForType = false;
   private Writer mMappingWriter;
-
+  private Map<String, String> mRawDayName = new HashMap();
   private ARSCDecoder(InputStream arscStream, ApkDecoder decoder) throws AndrolibException, IOException {
     mOldFileName = new LinkedHashMap<>();
     mCurSpecNameToPos = new LinkedHashMap<>();
@@ -406,6 +406,7 @@ public class ARSCDecoder {
     if (mCurrTypeID != id) {
       mCurrTypeID = id;
       initResGuardBuild(mCurrTypeID);
+      mRawDayName.clear();
     }
     // 是否混淆文件路径
     mShouldResguardForType = isToResguardFile(mTypeNames.getString(id - 1));
@@ -581,7 +582,8 @@ public class ARSCDecoder {
     }
 
     if (!keepMapping) {
-      replaceString = mResguardBuilder.getReplaceString();
+//      replaceString = mResguardBuilder.getReplaceString();
+        replaceString=generateReplaceString(specNamesId);
     }
 
     mResguardBuilder.setInReplaceList(mCurEntryID);
@@ -593,6 +595,43 @@ public class ARSCDecoder {
     mPkg.putSpecNamesblock(replaceString);
     mType.putSpecResguardName(replaceString);
   }
+
+    private String generateReplaceString(int specNamesId) throws AndrolibException {
+        String replaceString;
+        String type = mType.getName();
+        if (("drawable".equals(type)) || ("color".equals(type))) {
+            String rawName = mSpecNames.get(specNamesId).toString();
+            String rawDayName = null;
+            String dayReplaceString = null;
+            if (rawName.startsWith("night_")) {
+                int nightIndex = rawName.indexOf("night_");
+                if ((nightIndex != -1) && (nightIndex + 6 < rawName.length())) {
+                    rawDayName = rawName.substring(nightIndex + 6);
+                }
+                if (rawDayName == null) {
+                    throw new AndrolibException("get rawDayName == null");
+                }
+                if (mRawDayName.containsKey(rawDayName)) {
+                    dayReplaceString = mRawDayName.get(rawDayName);
+                }
+                if (dayReplaceString != null) {
+                    replaceString = "night_" + dayReplaceString;
+                } else {
+                    replaceString = mResguardBuilder.getReplaceString();
+                    mRawDayName.put(rawDayName, replaceString);
+                    replaceString = "night_" + replaceString;
+                }
+            } else if (this.mRawDayName.containsKey(rawName)) {
+                replaceString = mRawDayName.get(rawName);
+            } else {
+                replaceString = mResguardBuilder.getReplaceString();
+                mRawDayName.put(rawName, replaceString);
+            }
+        } else {
+            replaceString = mResguardBuilder.getReplaceString();
+        }
+        return replaceString;
+    }
 
   private void writeEntry() throws IOException, AndrolibException {
     /* size */
